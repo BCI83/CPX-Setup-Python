@@ -900,7 +900,7 @@ fi
             print("The external IP of this server is:", external_ip)
         
     ### Finished
-        update_line_starting("setup_stage:","complete")
+        update_line_starting("setup_stage:","complete", setup_config_file)
         print("Setup has finished, monitor the CPX latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes")
         enter_to_cont()
     
