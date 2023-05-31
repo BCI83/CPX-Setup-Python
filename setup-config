@@ -1,0 +1,50 @@
+####################################################################
+########################  Setup Stage  #############################
+setup_stage:
+####################################################################
+#######################  Network Checks  ###########################
+ping_lan:
+ping_wan:
+ping_fqdn:
+wget_portal:
+wget_portal5:
+wget_cloud:
+wget_cloud5:
+wget_registry:
+curl_portal:
+curl_portal5:
+curl_cloud:
+curl_cloud5:
+curl_registry:
+####################################################################
+################### VM  Network Configuration ######################
+ip_address:
+subnet_mask:
+default_gateway:
+dns1:
+dns2:
+dns3:
+hostname:
+ntp_address:
+ntp_pool_or_server:
+external_ip:
+####################################################################
+######################### Proxy Details ############################
+proxy_type:
+proxy_address:
+proxy_port:
+proxy_cert_req:
+proxy_ca_cert:
+proxy_ssl_cert:
+####################################################################
+##################### Symphony Configuration #######################
+account_name:
+account_id:
+account_portal:
+cpx_serviceUserEmail:
+cpx_serviceUserPassword:
+dmca_config_check:
+ssl_cert_file_name:
+ssl_cert_file_pass:
+ssl_cert_file_location:
+####################################################################
