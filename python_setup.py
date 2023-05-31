@@ -856,12 +856,11 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
     ### Update CronTab
         cron_bash = '''
 crontab -l | sort -u | crontab -
-if [[ $(crontab -l | head -n 1) != "MAILTO=\"\"" ]]; then
-    (echo "MAILTO=\"\""; crontab -l) | crontab -
+if [[ $(crontab -l | head -n 1) != 'MAILTO=""' ]]; then
+    (echo 'MAILTO=""'; crontab -l) | crontab -
 fi
 '''
         subprocess.run(['bash', '-c', cron_bash])
-
 
     ### make the cron logs folder
         folder_path = '/symphony/cpx/logs'
