@@ -185,7 +185,7 @@ def certificate(cert_name):
 def get_val(search_string, file_to_search = setup_config_file):
     with open(file_to_search, 'r') as file:
         content = file.read()
-        pattern = r'(?<=' + search_string + r')(.*)'
+        pattern = r'(?<='+search_string+" "+r')(.*)'
         match = re.search(pattern, content)        
         if match:
             found_val = match.group(1).strip().replace(' ', '')
@@ -630,9 +630,6 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 update_line_starting("dmca_config_check:", "dmca_config_check: yes", setup_config_file)
             else:
                 update_line_starting("dmca_config_check:", "dmca_config_check: no", setup_config_file)
-                update_line_starting("ssl_cert_file_name:", "ssl_cert_file_name: N/A", setup_config_file)
-                update_line_starting("ssl_cert_file_pass:", "ssl_cert_file_pass: N/A", setup_config_file)
-                update_line_starting("ssl_cert_file_location:", "ssl_cert_file_location: N/A", setup_config_file)
 
     ### Check if using a proxy
         if get_val("proxy_type:") == "":
@@ -640,11 +637,9 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             print("Do you need this server to be configured to use a web proxy for HTTP(S) communication?")
             if yn() == "N":
                 update_line_starting("proxy_type:","proxy_type: N/A", setup_config_file)
-                update_line_starting("proxy_cert_req:","proxy_cert_req: N/A", setup_config_file)
                 update_line_starting("proxy_address:","proxy_address: N/A", setup_config_file)
                 update_line_starting("proxy_port:","proxy_port: N/A", setup_config_file)
                 update_line_starting("proxy_ca_cert:","proxy_ca_cert: N/A", setup_config_file)
-                update_line_starting("proxy_int_cert:","proxy_int_cert: N/A", setup_config_file)
                 update_line_starting("proxy_ssl_cert:","proxy_ssl_cert: N/A", setup_config_file)
             else:
                 ASCII()
@@ -659,6 +654,8 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 if proxyqa == 1:
                     print("\nThis should work, details will be collected in the next step")
                     update_line_starting("proxy_type:","proxy_type: http:// and NO fixup", setup_config_file)
+                    update_line_starting("proxy_ca_cert:","proxy_ca_cert: N/A", setup_config_file)
+                    update_line_starting("proxy_ssl_cert:","proxy_ssl_cert: N/A", setup_config_file)
                     # should not need CA cert
                 elif proxyqa == 2:
                     print("\nThis should work, however if the proxy certificate is self-signed (not publicly trusted) some functionality may not work")
@@ -666,11 +663,13 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     print("details will be collected in the next step")
                     # will need CA cert
                     update_line_starting("proxy_type:","proxy_type: http:// with fixup", setup_config_file)
+                    update_line_starting("proxy_ssl_cert:","proxy_ssl_cert: N/A", setup_config_file)
                 elif proxyqa == 3:
                     print("\nNot currently supported")
                     # need to test with the proxy Dan said we had
                     # will need SSL cert
                     update_line_starting("proxy_type:","proxy_type: https:// and NO fixup", setup_config_file)
+                    update_line_starting("proxy_ca_cert:","proxy_ca_cert: N/A", setup_config_file)
                 elif proxyqa == 4:
                     print("\nNot currently supported")                    
                     # need to test with the proxy Dan said we had
@@ -678,11 +677,6 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     update_line_starting("proxy_type:","proxy_type: https:// with fixup", setup_config_file)
 
                 enter_to_cont()
-
-                #record if proxy cert(s) required)
-                #if proxyqa != 1 and proxyqa != 5: # for if/when options 3 and 4 work
-                if proxyqa == 2:
-                    update_line_starting("proxy_cert_req:", "proxy_cert_req: yes", setup_config_file)
 
                 #if proxyqa != 5 or proxyqa != 1: # for if/when options 3 and 4 work
                 if proxyqa == 1 or proxyqa == 2:
@@ -696,22 +690,20 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                             break
     ### Install required certs    
         ip = get_val("ip_address:")
-        proxy_type = get_val("proxy_type:")
-        if get_val("dmca_config_check:") == "yes" or get_val("proxy_cert_req:") == "yes":
-            
+        if get_val("dmca_config_check:") == "yes" or get_val("proxy_type:") == "http://withfixup" or get_val("proxy_type:") == "https://andNOfixup" or get_val("proxy_type:") == "https://withfixup":
             req_cert_list = []
             ASCII()
             print("The following certificates are required:\n")
             if get_val("dmca_config_check:") == "yes" and get_val("ssl_cert_file_name:") == "":
                 print("-- DMCA SSL certificate\n")
                 req_cert_list.append("DMCA SSL certificate")
-            if proxy_type == "http:// with fixup" and get_val("proxy_ca_cert:") == "":
+            if get_val("proxy_type:") == "http://withfixup" and get_val("proxy_ca_cert:") == "":
                 print("-- Proxy CA certificate\n")
                 req_cert_list.append("Proxy CA certificate")
-            if proxy_type == "https:// and NO fixup" and get_val("proxy_ssl_cert:") == "":
+            if get_val("proxy_type:") == "https://andNOfixup" and get_val("proxy_ssl_cert:") == "":
                 print("-- Proxy SSL certificate\n")
                 req_cert_list.append("Proxy SSL certificate")
-            if proxy_type == "https:// with fixup" and get_val("proxy_ca_cert:") == "" and get_val("proxy_ssl_cert:") == "":
+            if get_val("proxy_type:") == "https://withfixup" and get_val("proxy_ca_cert:") == "" and get_val("proxy_ssl_cert:") == "":
                 print("-- Proxy CA certificate")
                 print("-- Proxy SSL certificate\n")
                 req_cert_list.append("Proxy CA certificate")
@@ -727,6 +719,8 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     cert_type = req_cert_list.pop(0)
                     cert_to_add = certificate(cert_type)
                     add_cert(cert_type, cert_to_add)
+
+        
 ####### Symphony information collection
         ASCII()
         print("Collecting Symphony specific settings now\n( you will need your welcome email )")
@@ -800,11 +794,11 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
 ########### Info collection done
     ### Now add colledted data to the Ansible variable file (or update them if they already exist)            
         defaults_file = "/symphony/symphony-cpx-ansible-role/defaults/main.yml"
-        defaults_vars = ["account_name:", "account_id:", "account_portal:", "cpx_serviceUserEmail:", "cpx_serviceUserPassword:", "dmca_config_check:", "ssl_cert_file_name:", "ssl_cert_file_location:", "ssl_cert_file_pass:"]
+        defaults_vars = ["account_name:", "account_id:", "account_portal:", "cpx_serviceUserEmail:", "cpx_serviceUserPassword:", "dmca_config_check:", "ssl_cert_file_name:", "ssl_cert_file_location:", "ssl_cert_file_pass:" , "proxy_ca_cert:", "proxy_ssl_cert:", "proxy_type:"]
         for i in defaults_vars:
             update_defaults_file(i, defaults_file)
 
-    ### generate the new initial yaml file (excluding the questions), which replaces the start_here.yml file
+    ### generate the new initial yaml file (excluding the Q & A section), which is then run instead of start_here.yml
         playbook = '''---
 - hosts: localhost
 #  become: yes
@@ -838,7 +832,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
 
     - import_tasks: "tasks/main.yml"
 '''
-    ### it is given the new file name of new_start.yml (so the original method remains in place)
+    ### it is given the file name new_start.yml (so the original method remains in place)
         new_playbook="/symphony/symphony-cpx-ansible-role/new_start.yml"
         if os.path.exists(new_playbook):
             os.remove(new_playbook)
@@ -846,7 +840,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
         with open(new_playbook, 'a') as file:
             file.write(playbook)
 
-####### Run the newly created playbook
+####### Run the newly created playbook(s)
         command = 'sudo -u symphony ansible-playbook '+new_playbook
         subprocess.run(command, shell=True)
 
@@ -900,7 +894,7 @@ fi
             print("The external IP of this server is:", external_ip)
         
     ### Finished
-        update_line_starting("setup_stage:","complete", setup_config_file)
+        update_line_starting("setup_stage:","setup_stage: complete", setup_config_file)
         print("Setup has finished, monitor the CPX latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes")
         enter_to_cont()
     

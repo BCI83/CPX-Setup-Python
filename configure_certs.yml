@@ -1,0 +1,31 @@
+--- 
+
+- name: Configure SSL certificates
+  copy:
+    src: "{{ ssl_cert_file_location }}/{{ ssl_cert_file_name }}"
+    dest: "{{ symphony_certs_dir }}"
+    owner: symphony
+    group: symphony
+    mode: 0600 
+  become: true 
+  when: dmca_config_check == "yes" or dmca_config_check == "YES" or dmca_config_check == "y" or dmca_config_check == "Yes"
+
+- name: Configure Proxy CA certificate
+  copy:
+    src: "{{ proxy_ca_cert }}"
+    dest: "{{ symphony_certs_dir }}"
+    owner: symphony
+    group: symphony
+    mode: 0600
+  become: true
+  when: proxy_type == "http://withfixup" or proxy_type == "https://withfixup"
+
+- name: Configure Proxy SSL certificates
+  copy:
+    src: "{{ proxy_ssl_cert }}"
+    dest: "{{ symphony_certs_dir }}"
+    owner: symphony
+    group: symphony
+    mode: 0600
+  become: true
+  when: proxy_type == "https://andNOfixup" or proxy_type == "https://withfixup"
