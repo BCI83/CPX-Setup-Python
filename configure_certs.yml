@@ -1,6 +1,6 @@
 --- 
 
-- name: Configure SSL certificates
+- name: Configure DMCA SSL certificates
   copy:
     src: "{{ ssl_cert_file_location }}/{{ ssl_cert_file_name }}"
     dest: "{{ symphony_certs_dir }}"

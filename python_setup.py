@@ -230,6 +230,8 @@ def ping(server, var_line):
 
 def check_server(url):
     short_name = url.split(".")[0].split("//")[1]
+    if url == "https://cloud.avisplsymphony.com":
+        short_name = "cloud5"
     try:
         wget_command = f'wget --spider --no-check-certificate {url}'
         wget_process = subprocess.Popen(
@@ -238,16 +240,14 @@ def check_server(url):
         if wget_process.returncode == 0:
             wget_result = "OK"
         else:
-            if short_name == "cloud5":
-                wget_result = "File_not_found_(Expected_for_cloud5)"
-            else:
-                wget_result = "Fail"
+            wget_result = "Fail"
         update_line_starting("wget_"+short_name+":", "wget_" + short_name+": "+wget_result, setup_config_file)
     except Exception as e:
+        update_line_starting("curl_"+short_name+":", "curl_" + short_name+": "+curl_result, setup_config_file)
         pass
 
     try:
-        curl_command = f'curl -L -k --write-out %{{http_code}} --silent --output /dev/null  {url}'
+        curl_command = f'curl -L -k --write-out %{{http_code}} --silent --output /dev/null {url}'
         curl_process = subprocess.Popen(curl_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         curl_output, curl_error = curl_process.communicate()
         response_code = curl_output.decode().strip()
@@ -256,11 +256,12 @@ def check_server(url):
         elif response_code == "302":
             curl_result = "OK"
         elif response_code == "404":
-            curl_result = "404_Page_not_found_(Expected_for_cloud5)"
+            curl_result = "OK"
         elif response_code == "000":
             curl_result = "Failed"
         update_line_starting("curl_"+short_name+":", "curl_" + short_name+": "+curl_result, setup_config_file)
     except Exception as e:
+        update_line_starting("curl_"+short_name+":", "curl_" + short_name+": "+curl_result, setup_config_file)
         pass
 
 def get_session_type():
@@ -376,6 +377,11 @@ def update_defaults_file(key, file_path):
     updated_lines.append(key+" '"+get_val(key).replace(" ", "")+"'"+'\n')
     with open(file_path, 'w') as file:
         file.writelines(updated_lines)
+
+def add_cert_to_keystore(container_name, cert_name):
+    command = "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias "+cert_name+" -file /usr/local/share/ca-certificates/"+cert_name
+    exec_command = f'docker exec {container_name} /bin/sh -c "{command}"'
+    subprocess.run(exec_command, shell=True)
 
 ###################################################################################################
 ###                                     Main() starts here:                                     ###
@@ -608,7 +614,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
         portal = "https://portal.vnocsymphony.com"
         portal5 = "https://portal5.avisplsymphony.com"
         cloud = "https://cloud.vnocsymphony.com"
-        cloud5 = "https://cloud5.avisplsymphony.com"
+        cloud5 = "https://cloud.avisplsymphony.com"
         registry = "https://registry.vnocsymphony.com"
 
         check_server(portal)
@@ -657,7 +663,8 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
 
         ASCII()
         update_line_starting("setup_stage:", "setup_stage: network_applied", setup_config_file)
-        if question("The network configuration portion setup is complete\n\nWe recommend that you now disconnect from this session\nand then reconnect via SSH to finish the setup process\nas that will allow you to paste in details from your welcome email\n\nDo you want to disconnect from this session now?", "Yes (Reconnect via SSH (symphony@"+ip+" and the password starting '5ym'))", "No  (Manually type in the details from the welcome email in this session)") == 1:
+        print("The network configuration portion setup is complete\n\nWe recommend that you now disconnect from this session\nand then reconnect via SSH to finish the setup process\nas that will allow you to paste in details from your welcome email\n\nDo you want to disconnect from this session now?\nYes (Reconnect via SSH (symphony@"+ip+" and the password starting '5ym'))\nNo  (Manually type in the details from the welcome email in this session)")
+        if yn() == "N":
             os.system('pkill -KILL -u symphony')
         stage = "network_applied"
     stage = get_val("setup_stage:")
@@ -705,7 +712,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 elif proxyqa == 2:
                     print(
                         "\nThis should work, however if the proxy certificate is self-signed (not publicly trusted) some functionality may not work")
-                    print("specifically, the ability to remotely restart and upgrade the CPX, but the main funcion of collecting and sending monitoring data should still work")
+                    print("specifically, the ability to remotely restart and upgrade the Cloud Connector, but the main funcion of collecting and sending monitoring data should still work")
                     print("details will be collected in the next step")
                     # will need CA cert
                     update_line_starting("proxy_type:", "proxy_type: http:// with fixup", setup_config_file)
@@ -804,7 +811,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             while True:
                 ASCII()
                 print(
-                    "Please enter the 'Symphony Portal' from the welcome email\nIt consists of 3 or 4 letters)\n")
+                    "Please enter the 'Symphony Portal' from the welcome email\n( PROD / EMEA / INT )\n")
                 portal = input("Enter the Symphony Portal: ")
                 if portal.lower().startswith("p"):
                     env = "prod"
@@ -982,8 +989,6 @@ done
         command = 'sudo -u symphony ansible-playbook '+new_playbook
         subprocess.run(command, shell=True)
 
-
-
     ### After playbook tasks
         ASCII()
         print("\nPerforming post-install configuration changes...\n\nUpdating crontab settings...\n")
@@ -1047,24 +1052,27 @@ fi
                 _, ca, _ = split_file_path(get_val("proxy_ca_cert:"))
             if get_val("proxy_ssl_cert:") != "":
                 _, ssl, _ = split_file_path(get_val("proxy_ssl_cert:"))
-            subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "cp /symphony/keys/* /usr/local/share/ca-certificates/ && update-ca-certificates"'])
+            container_name = get_val("account_name:")+"_cpx_tomcat"
+            command = "cp /symphony/keys/* /usr/local/share/ca-certificates/ && update-ca-certificates"
+            exec_command = f'docker exec {container_name} /bin/sh -c "{command}"'
+            subprocess.run(exec_command, shell=True)
             time.sleep(2)
-            ca_command = '"keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ca+' -file /usr/local/share/ca-certificates/'+ca+'"'
-            ssl_command = '"keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ssl+' -file /usr/local/share/ca-certificates/'+ssl+'"'
             if get_val("proxy_type:") == "http://withfixup":
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat bash -c '+ca_command+''])
+                add_cert_to_keystore(container_name, ca)
             if get_val("proxy_type:") == "https://andNOfixup":
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat bash -c '+ssl_command+''])
+                add_cert_to_keystore(container_name, ssl)
             if get_val("proxy_type:") == "https://withfixup":
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ca+' -file /usr/local/share/ca-certificates/'+ca+'"'])
+                add_cert_to_keystore(container_name, ca)
                 time.sleep(2)
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ssl+' -file /usr/local/share/ca-certificates/'+ssl+'"'])
-            time.sleep(2)
+                add_cert_to_keystore(container_name, ssl)
+                time.sleep(2)
             subprocess.run(['bash', '-c', 'docker restart '+get_val("account_name:")+'_cpx_tomcat'])
 
+            # docker exec BCI_cpx_tomcat bash -c 'cp /symphony/keys/* /usr/local/share/ca-certificates/ && update-ca-certificates'
+            # docker exec BCI_cpx_tomcat bash -c 'keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias ProxyCA.crt -file /usr/local/share/ca-certificates/ProxyCA.crt'
     ### Finished
         update_line_starting("setup_stage:", "setup_stage: complete", setup_config_file)
-        print("\nSetup has finished, monitor the CPX latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes")
+        print("\nSetup has finished, monitor the Cloud Connector latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes\n\n")
         quit()
     if get_val("setup_stage:") == "complete":        
         quit()
