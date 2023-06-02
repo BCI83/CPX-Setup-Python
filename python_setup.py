@@ -10,6 +10,7 @@ import socket
 import shutil
 import requests
 import math
+import time
 
 ostest = platform.platform()
 current_hostname = socket.gethostname()
@@ -258,8 +259,7 @@ def check_server(url):
             curl_result = "404_Page_not_found_(Expected_for_cloud5)"
         elif response_code == "000":
             curl_result = "Failed"
-        update_line_starting("curl_"+short_name+":", "curl_" +
-                             short_name+": "+curl_result, setup_config_file)
+        update_line_starting("curl_"+short_name+":", "curl_" + short_name+": "+curl_result, setup_config_file)
     except Exception as e:
         pass
 
@@ -303,7 +303,7 @@ def add_cert(cert_type, cert_path):
                     ssl_cert_path = cert_path
                     ca_cert_path = ""
 
-                directory_path, filename_with_extension = split_file_path(cert_path)
+                directory_path, filename_with_extension, filename_without_extension = split_file_path(cert_path)
                     
                 if "DMCA SSL" in cert_type:
                     if ssl_cert_path != "":
@@ -325,7 +325,8 @@ def add_cert(cert_type, cert_path):
 def split_file_path(full_path_to_split):
     directory_path = os.path.dirname(full_path_to_split)
     filename_with_extension = os.path.basename(full_path_to_split)
-    return directory_path, filename_with_extension
+    filename_without_extension = os.path.splitext(filename_with_extension)[0]
+    return directory_path, filename_with_extension, filename_without_extension
 
 def der_to_pem(der_path):
     # Read the DER certificate from the file
@@ -380,7 +381,14 @@ def update_defaults_file(key, file_path):
 ###                                     Main() starts here:                                     ###
 ###################################################################################################
 stage = get_val("setup_stage:")
-
+ip = get_val("ip_address:")
+sn = get_val("subnet_mask:")
+gw = get_val("default_gateway:")
+dns1 = get_val("dns1:")
+dns2 = get_val("dns2:")
+dns3 = get_val("dns3:")
+new_hostname = get_val("hostname:")
+ntpstring = get_val("ntp_address:")
 while True:
     # '''1
     while stage == "":
@@ -564,15 +572,10 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             backup_original(ntp_file)
             default_ntp = "pool 2.debian.pool.ntp.org iburst"
             update_line_containing(default_ntp, ntpstring, ntp_file)
-            update_line_starting("ntp_address:", "ntp_address: "+new_ntp, setup_config_file)
-            if ntpa == 1 or ntpa == 3:
-                update_line_starting("ntp_pool_or_server:", "ntp_pool_or_server: pool", setup_config_file)
-            else:
-                update_line_starting("ntp_pool_or_server:", "ntp_pool_or_server: server", setup_config_file)
+            update_line_starting("ntp_address:", "ntp_address: "+ntpstring, setup_config_file)
             print("NTP settings applied\n")
         else:
             update_line_starting("ntp_address:", "ntp_address: 2.debian.pool.ntp.org", setup_config_file)
-            update_line_starting("ntp_pool_or_server:", "ntp_pool_or_server: pool", setup_config_file)
             print("NTP settings default\n")
     # Restart networking service
         print("Restarting networking services\n")
@@ -582,18 +585,24 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
 # Running network tests
     # LAN
         ASCII()
-        print("Done applying the network changes, starting tests...\n\nIs PING/ICMP disabled/blocked on this network?")
-        if yn() == "N":
-            if ping(gw, "ping_lan:") == "restart_setup":
-                stage = ""
-                break
-            print("Running network tests, 1 of 13 complete  |#            |\r", end="")
-            ping("8.8.8.8", "ping_wan:")
-            print("Running network tests, 2 of 13 complete  |##           |\r", end="")
-            ping("google.com", "ping_fqdn:")
-            print("Running network tests, 3 of 13 complete  |###          |\r", end="")
-        else:
-            print("Skipping PING tests")
+        print("Done applying the network changes, starting tests...\n")
+        if ping(gw, "ping_lan:") == "restart_setup":
+            setup_stage = ""
+            update_line_starting("setup_stage:", "setup_stage:", setup_config_file)
+            update_line_starting("ip_address:", "ip_address:", setup_config_file)
+            update_line_starting("subnet_mask:", "subnet_mask:", setup_config_file)
+            update_line_starting("default_gateway:", "default_gateway:", setup_config_file)
+            update_line_starting("dns1:", "dns1:", setup_config_file)
+            update_line_starting("dns2:", "dns2:", setup_config_file)
+            update_line_starting("dns3:", "dns3:", setup_config_file)
+            update_line_starting("hostname:", "hostname:", setup_config_file)
+            update_line_starting("ntp_address:", "ntp_address:", setup_config_file)
+            break
+        print("Running network tests, 1 of 13 complete  |#            |\r", end="")
+        ping("8.8.8.8", "ping_wan:")
+        print("Running network tests, 2 of 13 complete  |##           |\r", end="")
+        ping("google.com", "ping_fqdn:")
+        print("Running network tests, 3 of 13 complete  |###          |\r", end="")
 
     # WAN
         portal = "https://portal.vnocsymphony.com"
@@ -810,8 +819,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     enter_to_cont()
                     env = ""
                 if env != "":
-                    update_line_starting(
-                        "account_portal:", "account_portal: "+env, setup_config_file)
+                    update_line_starting("account_portal:", "account_portal: "+env, setup_config_file)
                     break
 
         if get_val("cpx_serviceUserEmail:") == "":
@@ -821,8 +829,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     "Please enter the 'Cloud Connector Username' from the welcome email\n")
                 ccu = input("Enter the Cloud Connector Username: ")
                 if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', ccu):
-                    update_line_starting(
-                        "cpx_serviceUserEmail:", "cpx_serviceUserEmail: "+ccu, setup_config_file)
+                    update_line_starting("cpx_serviceUserEmail:", "cpx_serviceUserEmail: "+ccu, setup_config_file)
                     break
                 else:
                     print(
@@ -836,8 +843,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     "Please enter the 'Cloud Connector Password' from the welcome email\n")
                 ccp = get_password("Cloud Connector Password")
                 if len(ccp) > 0:
-                    update_line_starting(
-                        "cpx_serviceUserPassword:", "cpx_serviceUserPassword: "+ccp, setup_config_file)
+                    update_line_starting("cpx_serviceUserPassword:", "cpx_serviceUserPassword: "+ccp, setup_config_file)
                     break
 
 #########################################################################################################
@@ -935,6 +941,8 @@ PROXYHOST="{proxy_a}"
 PROXYPORT="{proxy_p}"
 export CATALINA_OPTS="$CATALINA_OPTS -Dhttp.proxyHost=$PROXYHOST"
 export CATALINA_OPTS="$CATALINA_OPTS -Dhttp.proxyPort=$PROXYPORT"
+export CATALINA_OPTS="$CATALINA_OPTS -Dhttps.proxyHost=$PROXYHOST"
+export CATALINA_OPTS="$CATALINA_OPTS -Dhttps.proxyPort=$PROXYPORT"
 '''     
             set_env += set_env_2
 ####
@@ -951,7 +959,7 @@ export CATALINA_OPTS="$CATALINA_OPTS -Dhttps.proxyPort=$PROXYPORT"
 echo "Using CATALINA_OPTS:"
 for arg in $CATALINA_OPTS
 do
-        echo $arg
+    echo $arg
 done
 
 echo "Using JAVA_OPTS:"
@@ -1020,34 +1028,43 @@ fi
                         "Unable to get external IP from 'api.ipify.org'... trying the last resort...")
                     command = "dig @resolver1.opendns.com myip.opendns.com +short"
                     output = ""
-                    output = subprocess.check_output(
-                        command, shell=True).decode().strip()
+                    output = subprocess.check_output(command, shell=True).decode().strip()
                     if output != "":
                         external_ip = response.text.strip()
                     else:
                         print("Unable to get external IP.")
-        if external_ip:
+        if external_ip != "":
+            update_line_starting("external_ip:", "external_ip: "+external_ip, setup_config_file)
             print("The external IP of this server is:", external_ip)
 
-    ### Apply certificates in the tomcat container if necessary
+    ### Apply certificates in the tomcat container if necessary        
         if get_val("proxy_ca_cert:") != "" or get_val("proxy_ssl_cert:") != "":
+            print("\nApplying proxy certificate(s) to the Tomcat container, waiting 10 seconds for containers to fully load\n")
+            for i in range(10, 0, -1):
+                print(f"Waiting {i} seconds...")
+                time.sleep(1)
             if get_val("proxy_ca_cert:") != "":
-                _, ca = split_file_path(get_val("proxy_ca_cert:"))
+                _, ca, _ = split_file_path(get_val("proxy_ca_cert:"))
             if get_val("proxy_ssl_cert:") != "":
-                _, ssl = split_file_path(get_val("proxy_ssl_cert:"))                
+                _, ssl, _ = split_file_path(get_val("proxy_ssl_cert:"))
             subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "cp /symphony/keys/* /usr/local/share/ca-certificates/ && update-ca-certificates"'])
+            time.sleep(2)
+            ca_command = '"keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ca+' -file /usr/local/share/ca-certificates/'+ca+'"'
+            ssl_command = '"keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ssl+' -file /usr/local/share/ca-certificates/'+ssl+'"'
             if get_val("proxy_type:") == "http://withfixup":
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias proxy.crt -file /usr/local/share/ca-certificates/'+ca+'"'])
+                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat bash -c '+ca_command+''])
             if get_val("proxy_type:") == "https://andNOfixup":
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias proxy.crt -file /usr/local/share/ca-certificates/'+ssl+'"'])
+                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat bash -c '+ssl_command+''])
             if get_val("proxy_type:") == "https://withfixup":
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias proxy.crt -file /usr/local/share/ca-certificates/'+ca+'"'])
-                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias proxy.crt -file /usr/local/share/ca-certificates/'+ssl+'"'])
+                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ca+' -file /usr/local/share/ca-certificates/'+ca+'"'])
+                time.sleep(2)
+                subprocess.run(['bash', '-c', 'docker exec -it '+get_val("account_name:")+'_cpx_tomcat sh -c "keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias '+ssl+' -file /usr/local/share/ca-certificates/'+ssl+'"'])
+            time.sleep(2)
+            subprocess.run(['bash', '-c', 'docker restart '+get_val("account_name:")+'_cpx_tomcat'])
 
     ### Finished
         update_line_starting("setup_stage:", "setup_stage: complete", setup_config_file)
-        print("Setup has finished, monitor the CPX latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes")
-        enter_to_cont()
+        print("\nSetup has finished, monitor the CPX latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes")
         quit()
     if get_val("setup_stage:") == "complete":        
         quit()
