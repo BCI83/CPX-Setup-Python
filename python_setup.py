@@ -23,17 +23,18 @@ setup_config_file = "/symphony/setup-config"
 
 def ASCII():
     clear()
-    print(''' ____                        _
-/ ___| _   _ _ __ ___  _ __ | |__   ___  _ __  _   _
-\___ \| | | | '_ ' _ \| '_ \| '_ \ / _ \| '_ \| | | |
- ___) | |_| | | | | | | |_) | | | | (_) | | | | |_| |
-|____/ \__, |_| |_| |_| .__/|_| |_|\___/|_| |_|\__, |
-  ____ |___/_  __    _|_|       _              |___/
- / ___|  _ \ \/ /   / ___|  ___| |_ _   _ _ __
-| |   | |_) \  /    \___ \ / _ \ __| | | | '_ \\
-| |___|  __//  \     ___) |  __/ |_| |_| | |_) |
- \____|_|  /_/\_\   |____/ \___|\__|\__,_| .__/
-                                         |_|
+    print('''  ____                        _                          ____ _                 _ 
+ / ___| _   _ _ __ ___  _ __ | |__   ___  _ __  _   _   / ___| | ___  _   _  __| |
+ \___ \| | | | '_ ` _ \| '_ \| '_ \ / _ \| '_ \| | | | | |   | |/ _ \| | | |/ _` |
+  ___) | |_| | | | | | | |_) | | | | (_) | | | | |_| | | |___| | (_) | |_| | (_| |
+ |____/ \__, |_| |_| |_| .__/|_| |_|\___/|_| |_|\__, |  \____|_|\___/ \__,_|\__,_|
+        |___/          |_|                      |___/                             
+   ____                            _                  ____       _                   
+  / ___|___  _ __  _ __   ___  ___| |_   ___  _ __   / ___|  ___| |_ _   _ _ __      
+ | |   / _ \| '_ \| '_ \ / _ \/ __| __| / _ \| '__|  \___ \ / _ \ __| | | | '_ \     
+ | |__| (_) | | | | | | |  __/ (__| |_ | (_) | |      ___) |  __/ |_| |_| | |_) |    
+  \____\___/|_| |_|_| |_|\___|\___|\__| \___/|_|     |____/ \___|\__|\__,_| .__/     
+                                                                          |_|
 ''')
 
 def clear():
@@ -473,7 +474,8 @@ while True:
                 new_hostname = current_hostname
 
         # NTP config
-        if get_val("ntp_address:") == "":
+        ntpstring = get_val("ntp_address:")
+        if ntpstring == "":
             ASCII()
             print("This machine is currently configured to use a pool of NTP servers from ntp.org\nDo you want to provide your own NTP server/pool details?")
             if yn() == "Y":
@@ -484,47 +486,57 @@ while True:
                 ntpqo3 = "An NTP pool hostname/FQDN"
                 ntpqo4 = "A single NTP server hostname/FQDN"
                 ntpa = question(ntpq, ntpqo1, ntpqo2, ntpqo3, ntpqo4)
-
                 if ntpa == 1:
                     new_ntp = valid_ip("NTP pool Virtual-IP address")
+                    ntpstring = "pool "+new_ntp+" iburst"
                 elif ntpa == 2:
                     new_ntp = valid_ip("NTP server IP address")
+                    ntpstring = "server "+new_ntp+" iburst"
                 elif ntpa == 3:
                     print("Please enter the NTP pool hostname/FQDN")
                     new_ntp = valid_hostname()
+                    ntpstring = "pool "+new_ntp+" iburst"
                 elif ntpa == 4:
                     print("Please enter the NTP server hostname/FQDN")
                     new_ntp = valid_hostname()
+                    ntpstring = "server "+new_ntp+" iburst"
             else:
                 ntpa = 0
+        elif get_val("ntp_address:").startswith("pool "):
+            ntpa = 1
+            ntpstring = get_val("ntp_address:")
+            if get_val("ntp_address:") == "pool 2.debian.pool.ntp.org iburst":
+                ntpa = 0
+        elif get_val("ntp_address:").startswith("server "):
+            ntpa = 2
+            ntpstring = get_val("ntp_address:")
 
         ##################################################################################
         # confirm with user that all details are correct
-        ASCII()
-        print(f"""
+        if get_val("setup_stage:") == "":
+            ASCII()
+            print(f"""
 IP and subnetmask for this machine:                   {ip}/{sn}
 The default gateway for this machine:                 {gw}
 The DNS server(s) this machine will use:       DNS 1: {dns1}""")
-        if dns2 != "":
-            print(f"                                               DNS 2: {dns2}")
-        if dns3 != "":
-            print(f"                                               DNS 3: {dns3}")
-            print(f"The hostname for this machine will be:                {new_hostname}")
-        if ntpa == 1 or ntpa == 3:
-            ntpstring = "pool "+new_ntp+" iburst"
-            print(f"You have chosen to use the NTP pool:                  {new_ntp}")
-        elif ntpa == 2 or ntpa == 4:
-            ntpstring = "server "+new_ntp+" iburst"
-            print(f"You have chosen this single NTP server:               {new_ntp}")
-        else:
-            print(f"This machine will use the default NPT pool:           2.debian.pool.ntp.org")
+            if dns2 != "":
+                print(f"                                               DNS 2: {dns2}")
+            if dns3 != "":
+                print(f"                                               DNS 3: {dns3}")
+                print(f"The hostname for this machine will be:                {new_hostname}")
+            if ntpa == 1 or ntpa == 3:
+                print(f"You have chosen to use the NTP pool:                  {ntpstring}")
+            elif ntpa == 2 or ntpa == 4:
+                print(f"You have chosen this single NTP server:               {ntpstring}")
+            else:
+                print(f"This machine will use the default NPT pool:           pool 2.debian.pool.ntp.org iburst")
 
-        print("\n\nAre all of the details above correct?\n( N will restart this setup script )\n")
+            print("\n\nAre all of the details above correct?\n( N will restart this setup script )\n")
 
-        if yn() == "Y":
-            stage = "network_collect"
-            update_line_starting("setup_stage:", "setup_stage: network_collect", setup_config_file)
-            break
+            if yn() == "Y":
+                stage = "network_collect"
+                update_line_starting("setup_stage:", "setup_stage: "+stage, setup_config_file)
+                break
 
     ##################################################################################
     # Apply settings
@@ -548,7 +560,6 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
         dns_file = "/etc/resolv.conf"
         backup_original(dns_file)
         with open(dns_file, 'w') as file:
-            # Use truncate() to remove all data from the file
             file.truncate()
         # Open the file in append mode to add new lines
         with open(dns_file, 'a') as file:
@@ -573,15 +584,15 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             update_line_starting("hostname:", "hostname: " + current_hostname, setup_config_file)
             print("The hostname is remaining set to "+current_hostname+"\n")
     # NTP
+        default_ntp = "pool 2.debian.pool.ntp.org iburst"
         if ntpa != 0:
-            ntp_file = "/etc/chrony/chrony"
+            ntp_file = "/etc/chrony/chrony.conf"
             backup_original(ntp_file)
-            default_ntp = "pool 2.debian.pool.ntp.org iburst"
             update_line_containing(default_ntp, ntpstring, ntp_file)
             update_line_starting("ntp_address:", "ntp_address: "+ntpstring, setup_config_file)
             print("NTP settings applied\n")
         else:
-            update_line_starting("ntp_address:", "ntp_address: 2.debian.pool.ntp.org", setup_config_file)
+            update_line_starting("ntp_address:", "ntp_address: "+default_ntp, setup_config_file)
             print("NTP settings default\n")
     # Restart networking service
         print("Restarting networking services\n")
@@ -663,8 +674,8 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
 
         ASCII()
         update_line_starting("setup_stage:", "setup_stage: network_applied", setup_config_file)
-        print("The network configuration portion setup is complete\n\nWe recommend that you now disconnect from this session\nand then reconnect via SSH to finish the setup process\nas that will allow you to paste in details from your welcome email\n\nDo you want to disconnect from this session now?\nYes (Reconnect via SSH (symphony@"+ip+" and the password starting '5ym'))\nNo  (Manually type in the details from the welcome email in this session)")
-        if yn() == "N":
+        print("The network configuration portion setup is complete\n\nWe recommend that you now disconnect from this session\nand then reconnect via SSH to finish the setup process\nas that will allow you to paste in details from your welcome email\n\nDo you want to disconnect from this session now?\n\nYes (Reconnect via SSH (symphony@"+ip+" and the password starting '5ym'))\nNo  (Manually type in the details from the welcome email in this session)")
+        if yn() == "Y":
             os.system('pkill -KILL -u symphony')
         stage = "network_applied"
     stage = get_val("setup_stage:")
@@ -686,11 +697,11 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             ASCII()
             print("Do you need this server to be configured to use a web proxy for HTTP(S) communication?")
             if yn() == "N":
-                update_line_starting("proxy_type:", "proxy_type: N/A", setup_config_file)
-                update_line_starting("proxy_address:", "proxy_address: N/A", setup_config_file)
-                update_line_starting("proxy_port:", "proxy_port: N/A", setup_config_file)
-                update_line_starting("proxy_ca_cert:", "proxy_ca_cert: N/A", setup_config_file)
-                update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert: N/A", setup_config_file)
+                update_line_starting("proxy_type:", "proxy_type:", setup_config_file)
+                update_line_starting("proxy_address:", "proxy_address:", setup_config_file)
+                update_line_starting("proxy_port:", "proxy_port:", setup_config_file)
+                update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
+                update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
             else:
                 ASCII()
                 proxyq = "Select the option which best describes your proxy"
@@ -706,8 +717,8 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     print(
                         "\nThis should work, details will be collected in the next step")
                     update_line_starting("proxy_type:", "proxy_type: http:// and NO fixup", setup_config_file)
-                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert: N/A", setup_config_file)
-                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert: N/A", setup_config_file)
+                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
+                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
                     # should not need CA cert
                 elif proxyqa == 2:
                     print(
@@ -716,13 +727,13 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     print("details will be collected in the next step")
                     # will need CA cert
                     update_line_starting("proxy_type:", "proxy_type: http:// with fixup", setup_config_file)
-                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert: N/A", setup_config_file)
+                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
                 elif proxyqa == 3:
                     print("\nNot currently supported")
                     # need to test with the proxy Dan said we had
                     # will need SSL cert
                     update_line_starting("proxy_type:", "proxy_type: https:// and NO fixup", setup_config_file)
-                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert: N/A", setup_config_file)
+                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
                 elif proxyqa == 4:
                     print("\nNot currently supported")
                     # need to test with the proxy Dan said we had
@@ -984,6 +995,16 @@ done
         with open(setenv_path, 'a') as file:
             file.write(set_env)
 
+###
+        docker_compose_template = "/symphony/symphony-cpx-ansible-role/templates/docker-compose.yml.j2"
+        backup_original(docker_compose_template)
+        if get_val("proxy_ca_cert:") != "":
+            _, ca, _ = split_file_path(get_val("proxy_ca_cert:"))
+            update_line_starting("    volumes:", "    volumes:\n      - ./config/rsa/"+ca+":/usr/local/share/ca-certificates/"+ca, docker_compose_template)
+        if get_val("proxy_ssl_cert:") != "":
+            _, ssl, _ = split_file_path(get_val("proxy_ssl_cert:"))
+            update_line_starting("    volumes:", "    volumes:\n      - ./config/rsa/"+ssl+":/usr/local/share/ca-certificates/"+ssl, docker_compose_template)
+
 ##########################################################################################################
 # Run the newly created playbook(s)
         command = 'sudo -u symphony ansible-playbook '+new_playbook
@@ -1043,9 +1064,10 @@ fi
             print("The external IP of this server is:", external_ip)
 
     ### Apply certificates in the tomcat container if necessary        
-        if get_val("proxy_ca_cert:") != "" or get_val("proxy_ssl_cert:") != "":
-            print("\nApplying proxy certificate(s) to the Tomcat container, waiting 10 seconds for containers to fully load\n")
-            for i in range(10, 0, -1):
+        if get_val("proxy_ca_cert:") != "" or get_val("proxy_ssl_cert:") != "":            
+            for i in range(30, 0, -1):
+                ASCII()
+                print("\nWaiting 30 seconds to allow the containers to fully load before applying proxy certificate(s) to the Tomcat container\n")
                 print(f"Waiting {i} seconds...")
                 time.sleep(1)
             if get_val("proxy_ca_cert:") != "":
@@ -1053,9 +1075,6 @@ fi
             if get_val("proxy_ssl_cert:") != "":
                 _, ssl, _ = split_file_path(get_val("proxy_ssl_cert:"))
             container_name = get_val("account_name:")+"_cpx_tomcat"
-            command = "cp /symphony/keys/* /usr/local/share/ca-certificates/ && update-ca-certificates"
-            exec_command = f'docker exec {container_name} /bin/sh -c "{command}"'
-            subprocess.run(exec_command, shell=True)
             time.sleep(2)
             if get_val("proxy_type:") == "http://withfixup":
                 add_cert_to_keystore(container_name, ca)
@@ -1066,10 +1085,14 @@ fi
                 time.sleep(2)
                 add_cert_to_keystore(container_name, ssl)
                 time.sleep(2)
+            time.sleep(2)
+            exec_command = f'docker exec {container_name} /bin/sh -c update-ca-certificates'
+            subprocess.run(exec_command, shell=True)
+            time.sleep(2)
             subprocess.run(['bash', '-c', 'docker restart '+get_val("account_name:")+'_cpx_tomcat'])
 
-            # docker exec BCI_cpx_tomcat bash -c 'cp /symphony/keys/* /usr/local/share/ca-certificates/ && update-ca-certificates'
-            # docker exec BCI_cpx_tomcat bash -c 'keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias ProxyCA.crt -file /usr/local/share/ca-certificates/ProxyCA.crt'
+            # docker exec BCI_cpx_tomcat bash -c 'cp /symphony/keys/* /usr/local/share/ca-certificates/ && keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias ProxyCA.crt -file /usr/local/share/ca-certificates/ProxyCA.crt && update-ca-certificates'
+    
     ### Finished
         update_line_starting("setup_stage:", "setup_stage: complete", setup_config_file)
         print("\nSetup has finished, monitor the Cloud Connector latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes\n\n")
