@@ -34,6 +34,9 @@ proxy_address:
 proxy_port:
 proxy_ca_cert:
 proxy_ssl_cert:
+service_u_ca_c:
+service_keytool_ca:
+service_keytool_ssl:
 ####################################################################
 ##################### Symphony Configuration #######################
 account_name:
