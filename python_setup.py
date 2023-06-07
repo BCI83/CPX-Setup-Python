@@ -1003,7 +1003,7 @@ done
         setenv_path = "/symphony/symphony-cpx-ansible-role/templates/config/setenv.sh.j2"
         backup_original(setenv_path)
         os.remove(setenv_path)
-        subprocess.run(["sudo", "-u", "symphony", "touch", setenv_path])
+        subprocess.run("touch "+ setenv_path, shell=True)
         with open(setenv_path, 'a') as file:
             file.write(set_env)
 
@@ -1016,6 +1016,47 @@ done
         if get_value("proxy_ssl_cert:") != "":
             _, ssl, _ = split_file_path(get_value("proxy_ssl_cert:"))
             insert_after_word_in_file("volumes:", "      - ./config/rsa/"+ssl+":/usr/local/share/ca-certificates/"+ssl+"\n", docker_compose_template)
+
+    ### Add proxy certs to the 'configure_certs.yml
+
+        new_yaml = f'''--- 
+
+- name: Configure DMCA SSL certificates
+  copy:
+    src: "{{ ssl_cert_file_location }}/{{ ssl_cert_file_name }}"
+    dest: "{{ symphony_certs_dir }}"
+    owner: symphony
+    group: symphony
+    mode: 0600 
+  become: true 
+  when: dmca_config_check == "yes" or dmca_config_check == "YES" or dmca_config_check == "y" or dmca_config_check == "Yes"
+
+- name: Configure Proxy CA certificate
+  copy:
+    src: "{{ proxy_ca_cert }}"
+    dest: "{{ symphony_certs_dir }}"
+    owner: symphony
+    group: symphony
+    mode: 0600
+  become: true
+  when: proxy_type == "http://withfixup" or proxy_type == "https://withfixup"
+
+- name: Configure Proxy SSL certificates
+  copy:
+    src: "{{ proxy_ssl_cert }}"
+    dest: "{{ symphony_certs_dir }}"
+    owner: symphony
+    group: symphony
+    mode: 0600
+  become: true
+  when: proxy_type == "https://andNOfixup" or proxy_type == "https://withfixup"
+''' 
+        configure_certs_yaml = "/symphony/symphony-cpx-ansible-role/tasks/configure_certs.yml"
+        backup_original(configure_certs_yaml)
+        os.remove(configure_certs_yaml)
+        subprocess.run("touch "+configure_certs_yaml, shell=True)
+        with open(configure_certs_yaml, 'a') as file:
+            file.write(new_yaml)
 
 ##########################################################################################################
 # Run the newly created playbook(s)
@@ -1058,18 +1099,18 @@ fi
             container_name = get_value("account_name:")+"_cpx_tomcat"
             tomcat_script_command = 'docker inspect --format {{.Created}} '+container_name
             script_text = f'''#!/bin/bash
-threshold=100
+threshold=100 # if container not older than this many seconds, then try to apply the certs
 ca="{ca_svc}"
 ssl="{ssl_svc}"
 k_ca_exists="keytool error: java.lang.Exception: Certificate not imported, alias <{ca_svc}> already exists"
 k_ssl_exists="keytool error: java.lang.Exception: Certificate not imported, alias <{ssl_svc}> already exists"
 
 while true; do
+    sleep 10
     created_time=$(docker inspect --format "{{{{.Created}}}}" {container_name} | sed 's/\..*//')
     age_seconds=$(( $(date +%s) - $(date -d "$created_time" +%s) ))
-
     if (( age_seconds < threshold )); then
-        sleep 80
+        sleep 70 # to allow the one-time setup tasks to complete in the container, so as to avoid the cert data being overwritten
 
         if [[ -n $ca ]]; then
             ca_output=$(docker exec {container_name} bash -c 'keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias {ca_svc} -file /usr/local/share/ca-certificates/{ca_svc}' 2>&1)
@@ -1097,9 +1138,12 @@ while true; do
         fi
 
         sleep 20
+    else
+        sed -i 's/service_keytool_ca:.*/service_keytool_ca:/' /symphony/setup-config
+        sed -i 's/service_keytool_ssl:.*/service_keytool_ssl:/' /symphony/setup-config
+        sed -i 's/service_u_ca_c:.*/service_u_ca_c:/' /symphony/setup-config
+        sleep 20
     fi
-
-    sleep 10
 done
 '''
             if os.path.exists(script_path):
@@ -1172,7 +1216,6 @@ WantedBy=multi-user.target
             else:
                 count = 2
             for i in range(1, seconds+1, +1):
-                found = 0
                 hashes = spaces = ""
                 for h in range(0,i):
                     hashes = hashes+"#"
@@ -1180,24 +1223,26 @@ WantedBy=multi-user.target
                     spaces = spaces+" "
                 ASCII()
                 print(f"\nWaiting for the newly created service to apply the proxy certificate(s) to the Tomcat container\n")                
-                print(f"|{hashes}{spaces}|{i}/{seconds} seconds")
+                print(f"| {hashes}{spaces}|{i}/{seconds} seconds")
                 if get_value("service_u_ca_c:") == "yes":
-                    update_line_starting("service_u_ca_c:","service_u_ca_c: successfully added",setup_config_file)
-                    found += 1
+                    v1 = 1
+                else:
+                    v1 = 0
                 if get_value("service_keytool_ca:") == "yes":
-                    update_line_starting("service_keytool_ca:","service_keytool_ca: successfully added",setup_config_file)
-                    found += 1
+                    v2 = 1
+                else:
+                    v2 = 0
                 if get_value("service_keytool_ssl:") == "yes":
-                    update_line_starting("service_keytool_ssl:","service_keytool_ssl: successfully added",setup_config_file)
-                    found += 1
-                if found == count:
-                    print("Certificates successfully installed by the newly created service)\n")
+                    v3 = 1
+                else:
+                    v3 = 0
+                if (v1+v2+v3) == count:
+                    print("\nCertificates successfully applied by the Tomcat monitor service\n")
                     break
-                print(str(found))
                 time.sleep(1)
     ### Finished
         update_line_starting("setup_stage:", "setup_stage: complete", setup_config_file)
-        print("\nSetup has finished, monitor the Cloud Connector latency graph in symphony,\nActivity should be visible in Symphony Portal within the next few minutes\n")
+        print("\nSetup has finished, monitor the Cloud Connector latency graph in symphony\nActivity should be visible in Symphony Portal within the next few minutes\n")
         quit()
     if get_value("setup_stage:") == "complete":        
         quit()
