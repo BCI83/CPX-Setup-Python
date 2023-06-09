@@ -203,13 +203,18 @@ def certificate(cert_name):
             print("\nNo file found at "+test_path+"\nPlease try again.\n")
             enter_to_cont()
 
-def get_value(search_string, file_to_search=setup_config_file):
+def get_value(search_string, file_to_search=setup_config_file, retain_spaces=0):
     with open(file_to_search, 'r') as file:
         content = file.read()
         pattern = r'(?<=' + search_string + r')(.*)'
         match = re.search(pattern, content)
         if match:
             found_val = match.group(1).strip().replace(' ', '')
+            if retain_spaces == 1:
+                pattern = r'(\w+.*)'
+                match = re.search(pattern, found_val)
+                if match:
+                    found_val = match.group(1).strip()
             return found_val
         else:
             return "NOT FOUND"
@@ -230,9 +235,10 @@ def ping(server, var_line):
         update_line_starting(var_line, var_line+" Failed", setup_config_file)
 
 def check_server(url):
-    short_name = url.split(".")[0].split("//")[1]
     if url == "https://cloud.avisplsymphony.com":
         short_name = "cloud5"
+    else:
+        short_name = url.split(".")[0].split("//")[1]
     try:
         wget_command = f'wget --spider --no-check-certificate {url}'
         wget_process = subprocess.Popen(
@@ -246,7 +252,6 @@ def check_server(url):
     except Exception as e:
         update_line_starting("curl_"+short_name+":", "curl_" + short_name+": "+curl_result, setup_config_file)
         pass
-
     try:
         curl_command = f'curl -L -k --write-out %{{http_code}} --silent --output /dev/null {url}'
         curl_process = subprocess.Popen(curl_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -414,7 +419,7 @@ ntpstring = get_value("ntp_address:")
 while True:
     # '''1
     while stage == "":
-        if get_value("setup_stage:") == "":
+        if ip == "" and sn == "" and gw == "" and dns1 == "":
             startq = "You will need the following information to hand before proceeding:"
             startqo1 = "The IP address you want to assign to this machine\n"
             startqo2 = "The subnet mask for the above IP (in slash notation eg: /24)\n"
@@ -425,17 +430,16 @@ while True:
             startqo7 = "Proxy details if required for internet access (IP/FQDN:Port, certificate(s))\n"
             startqo8 = "Your welcome email\n"
 
-            question(startq, startqo1, startqo2, startqo3, startqo4,
-                     startqo5, startqo6, startqo7, startqo8)
+            question(startq, startqo1, startqo2, startqo3, startqo4, startqo5, startqo6, startqo7, startqo8)
 
         # Get and validate IP
-        if get_value("ip_address:") == "":
+        if ip == "":
             ASCII()
             print("Please provide the IP address you want this machine to use\n( subnetmask information will be collected later )\n")
             ip = valid_ip("IP address you wish to set for this VM")
 
         # Get and validata subnet mask
-        if get_value("subnet_mask:") == "":
+        if sn == "":
             ASCII()
             print("Please provide the subnet mask for the "+ip+"address")
             print("""( use slash notation, like /24 or /27 see below table )\n
@@ -447,13 +451,13 @@ while True:
             sn = valid_sn()
 
         # Get and validate default gateway IP
-        if get_value("default_gateway:") == "":
+        if gw == "":
             ASCII()
             print("Please provide the default Gateway IP for "+ip+"\n")
             gw = valid_ip("Default Gateway IP address")
 
         # Get Primary DNS IP
-        if get_value("dns1:") == "":
+        if dns1 == "":
             ASCII()
             print("Please provide the first DNS server IP you want this machine to use\nIt can be internal/private and/or external/public\n")
             dns1 = valid_ip("DNS 1 IP address")
@@ -474,12 +478,15 @@ while True:
                     dns3 = valid_ip("DNS 3 IP address")
                 else:
                     dns3 = ""
+                    update_line_starting("dns3:", "dns3:", setup_config_file)
             else:
                 dns2 = ""
+                update_line_starting("dns2:", "dns2:", setup_config_file)
                 dns3 = ""
+                update_line_starting("dns3:", "dns3:", setup_config_file)
 
         # Get new hostname
-        if get_value("hostname:") == "":
+        if new_hostname == "":
             ASCII()
             current_hostname = socket.gethostname()
             print("Do you want to change the hostname of this machine?\nit is currently set to: "+current_hostname)
@@ -488,8 +495,7 @@ while True:
             else:
                 new_hostname = current_hostname
 
-        # NTP config
-        ntpstring = get_value("ntp_address:")
+        # NTP config       
         if ntpstring == "":
             ASCII()
             print("This machine is currently configured to use a pool of NTP servers from ntp.org\nDo you want to provide your own NTP server/pool details?")
@@ -519,12 +525,12 @@ while True:
                 ntpa = 0
         elif get_value("ntp_address:").startswith("pool"):
             ntpa = 1
-            ntpstring = get_value("ntp_address:")
-            if get_value("ntp_address:") == "pool 2.debian.pool.ntp.org iburst":
+            ntpstring = get_value("ntp_address:", setup_config_file, 1)
+            if get_value("ntp_address:", setup_config_file, 1) == "pool 2.debian.pool.ntp.org iburst":
                 ntpa = 0
         elif get_value("ntp_address:").startswith("server"):
             ntpa = 2
-            ntpstring = get_value("ntp_address:")
+            ntpstring = get_value("ntp_address:", setup_config_file, 1)
 
         ##################################################################################
         # confirm with user that all details are correct
@@ -546,15 +552,36 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             else:
                 print(f"This machine will use the default NPT pool:           pool 2.debian.pool.ntp.org iburst")
 
-            print("\n\nAre all of the details above correct?\n( N will restart this setup script )\n")
+            print("\n\nAre all of the details above correct?\n")
 
             if yn() == "Y":
                 stage = "network_collect"
                 update_line_starting("setup_stage:", "setup_stage: "+stage, setup_config_file)
                 break
+            else:
+                net_change = question("Which setting did you want to change?", "IP Address", "Subnet", "Default Gateway", "DNS Server(s)", "Hostname", "NTP Settings", "Quit this setup  (It will resume next time you login)")
+                if net_change == 1:
+                    ip = ""
+                if net_change == 2:
+                    update_line_starting("subnet_mask:", "subnet_mask:", setup_config_file)
+                    sn = ""
+                if net_change == 3:
+                    update_line_starting("default_gateway:", "default_gateway:", setup_config_file)
+                    gw = ""
+                if net_change == 4:
+                    update_line_starting("dns1:", "dns1:", setup_config_file)
+                    update_line_starting("dns2:", "dns2:", setup_config_file)
+                    update_line_starting("dns3:", "dns3:", setup_config_file)
+                    dns1 = dns2 = dns3 = ""
+                if net_change == 5:
+                    update_line_starting("hostname:", "hostname:", setup_config_file)
+                    new_hostname = ""
+                if net_change == 6:
+                    update_line_starting("ntp_address:", "ntp_address:", setup_config_file)
+                    ntpstring = ""
 
     ##################################################################################
-    # Apply settings
+    # Apply settings 
     while stage == "network_collect":
         # Networking (IP, Subnet, Gateway, default network adapter)
         int_file = "/etc/network/interfaces"
@@ -698,9 +725,9 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
         stage = "network_applied"
     stage = get_value("setup_stage:")
     while stage == "network_applied":
-        ASCII()
-        print(get_session_type()+", resuming setup...")
-        enter_to_cont()
+        for t in range(5, 1, +1):
+            ASCII()
+            print(get_session_type()+", resuming setup in "+str(t)+" seconds...")
         ASCII()
     # Check if using DMCA
         if get_value("dmca_config_check:") == "":
@@ -1023,8 +1050,8 @@ done
 
 - name: Configure DMCA SSL certificates
   copy:
-    src: "{{ ssl_cert_file_location }}/{{ ssl_cert_file_name }}"
-    dest: "{{ symphony_certs_dir }}"
+    src: "{{{{ ssl_cert_file_location }}}}/{{{{ ssl_cert_file_name }}}}"
+    dest: "{{{{ symphony_certs_dir }}}}"
     owner: symphony
     group: symphony
     mode: 0600 
@@ -1033,8 +1060,8 @@ done
 
 - name: Configure Proxy CA certificate
   copy:
-    src: "{{ proxy_ca_cert }}"
-    dest: "{{ symphony_certs_dir }}"
+    src: "{{{{ proxy_ca_cert }}}}"
+    dest: "{{{{ symphony_certs_dir }}}}"
     owner: symphony
     group: symphony
     mode: 0600
@@ -1043,8 +1070,8 @@ done
 
 - name: Configure Proxy SSL certificates
   copy:
-    src: "{{ proxy_ssl_cert }}"
-    dest: "{{ symphony_certs_dir }}"
+    src: "{{{{ proxy_ssl_cert }}}}"
+    dest: "{{{{ symphony_certs_dir }}}}"
     owner: symphony
     group: symphony
     mode: 0600
@@ -1107,15 +1134,24 @@ k_ssl_exists="keytool error: java.lang.Exception: Certificate not imported, alia
 
 while true; do
     sleep 10
-    created_time=$(docker inspect --format "{{{{.Created}}}}" {container_name} | sed 's/\..*//')
-    age_seconds=$(( $(date +%s) - $(date -d "$created_time" +%s) ))
-    if (( age_seconds < threshold )); then
-        sleep 70 # to allow the one-time setup tasks to complete in the container, so as to avoid the cert data being overwritten
+    
+    created_time=$(date -d $(docker inspect --format {{{{.Created}}}} {container_name}) +%s)
+    time_now=$(date +%s)
+    age_seconds=$((time_now - created_time))
+
+
+    if (( $age_seconds < $threshold )); then
+        echo "in window"
+		sed -i 's/service_keytool_ca:.*/service_keytool_ca:/' /symphony/setup-config
+        sed -i 's/service_keytool_ssl:.*/service_keytool_ssl:/' /symphony/setup-config
+        sed -i 's/service_u_ca_c:.*/service_u_ca_c:/' /symphony/setup-config
+        
+		sleep 70 # to allow the one-time setup tasks to complete in the container, so as to avoid the cert data being overwritten
 
         if [[ -n $ca ]]; then
             ca_output=$(docker exec {container_name} bash -c 'keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias {ca_svc} -file /usr/local/share/ca-certificates/{ca_svc}' 2>&1)
             if [[ $ca_output == *"Certificate was added to keystore"* ]] || [[ $ca_output == $k_ca_exists ]]; then
-                sed -i 's/service_keytool_ca:.*/service_keytool_ca: yes/' /symphony/setup-config            
+                sed -i 's/service_keytool_ca:.*/service_keytool_ca: yes/' /symphony/setup-config
             else
                 sed -i 's/service_keytool_ca:.*/service_keytool_ca: unknown/' /symphony/setup-config
             fi
@@ -1124,7 +1160,7 @@ while true; do
         if [[ -n $ssl ]]; then
             ssl_output=$(docker exec {container_name} bash -c 'keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias {ssl_svc} -file /usr/local/share/ca-certificates/{ssl_svc}' 2>&1)
             if [[ $ssl_output == *"Certificate was added to keystore"* ]] || [[ $ssl_output == $k_ca_exists ]]; then
-                sed -i 's/service_keytool_ssl:.*/service_keytool_ssl: yes/' /symphony/setup-config            
+                sed -i 's/service_keytool_ssl:.*/service_keytool_ssl: yes/' /symphony/setup-config
             else
                 sed -i 's/service_keytool_ssl:.*/service_keytool_ssl: unknown/' /symphony/setup-config
             fi
@@ -1132,16 +1168,14 @@ while true; do
 
         ucc_output=$(docker exec {container_name} bash -c 'update-ca-certificates' 2>&1)
         if [[ $ucc_output == *"1 added"* ]] || [[ $ucc_output == *"2 added"* ]] || [[ $ucc_output == *"3 added"* ]] || [[ $ucc_output == *"0 added"* ]]; then
-            sed -i 's/service_u_ca_c:.*/service_u_ca_c: yes/' /symphony/setup-config        
+            sed -i 's/service_u_ca_c:.*/service_u_ca_c: yes/' /symphony/setup-config
         else
             sed -i 's/service_u_ca_c:.*/service_u_ca_c: unknown/' /symphony/setup-config
         fi
 
         sleep 20
     else
-        sed -i 's/service_keytool_ca:.*/service_keytool_ca:/' /symphony/setup-config
-        sed -i 's/service_keytool_ssl:.*/service_keytool_ssl:/' /symphony/setup-config
-        sed -i 's/service_u_ca_c:.*/service_u_ca_c:/' /symphony/setup-config
+        echo "out of window"
         sleep 20
     fi
 done
@@ -1223,7 +1257,7 @@ WantedBy=multi-user.target
                     spaces = spaces+" "
                 ASCII()
                 print(f"\nWaiting for the newly created service to apply the proxy certificate(s) to the Tomcat container\n")                
-                print(f"| {hashes}{spaces}|{i}/{seconds} seconds")
+                print(f"|{hashes}{spaces}|{i}/{seconds} seconds")
                 if get_value("service_u_ca_c:") == "yes":
                     v1 = 1
                 else:
@@ -1242,7 +1276,7 @@ WantedBy=multi-user.target
                 time.sleep(1)
     ### Finished
         update_line_starting("setup_stage:", "setup_stage: complete", setup_config_file)
-        print("\nSetup has finished, monitor the Cloud Connector latency graph in symphony\nActivity should be visible in Symphony Portal within the next few minutes\n")
+        print("\nSetup has finished, monitor the Cloud Connector activity graphs in Symphony portal\nActivity should start within the next few minutes\n")
         quit()
     if get_value("setup_stage:") == "complete":        
         quit()
