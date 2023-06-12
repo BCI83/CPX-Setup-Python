@@ -270,7 +270,7 @@ def check_server(url):
         update_line_starting("curl_"+short_name+":", "curl_" + short_name+": "+curl_result, setup_config_file)
         pass
 
-def get_session_type():
+'''def get_session_type(): # currently unused
     command = "who am i | grep tty"
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, _ = process.communicate()
@@ -278,7 +278,7 @@ def get_session_type():
     if output:
         return "Connected via a console session"
     else:
-        return "Connected via an SSH session"
+        return "Connected via an SSH session"'''
 
 def get_password(name=""):
     while True:
@@ -526,7 +526,7 @@ while True:
         elif get_value("ntp_address:").startswith("pool"):
             ntpa = 1
             ntpstring = get_value("ntp_address:", setup_config_file, 1)
-            if get_value("ntp_address:", setup_config_file, 1) == "pool 2.debian.pool.ntp.org iburst":
+            if get_value("ntp_address:", setup_config_file, 1) == "pool 2.debian.pool.ntp.orig iburst":
                 ntpa = 0
         elif get_value("ntp_address:").startswith("server"):
             ntpa = 2
@@ -544,7 +544,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 print(f"                                               DNS 2: {dns2}")
             if dns3 != "":
                 print(f"                                               DNS 3: {dns3}")
-                print(f"The hostname for this machine will be:                {new_hostname}")
+            print(f"The hostname for this machine will be:                {new_hostname}")
             if ntpa == 1 or ntpa == 3:
                 print(f"You have chosen to use the NTP pool:                  {ntpstring}")
             elif ntpa == 2 or ntpa == 4:
@@ -552,7 +552,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             else:
                 print(f"This machine will use the default NPT pool:           pool 2.debian.pool.ntp.org iburst")
 
-            print("\n\nAre all of the details above correct?\n")
+            print("\n\nAre all of the details above correct?  ( 'No' to make changes or quit )\n")
 
             if yn() == "Y":
                 stage = "network_collect"
@@ -723,21 +723,20 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
         if yn() == "Y":
             os.system('pkill -KILL -u symphony')
         stage = "network_applied"
+        
     stage = get_value("setup_stage:")
     while stage == "network_applied":
-        for t in range(5, 1, +1):
-            ASCII()
-            print(get_session_type()+", resuming setup in "+str(t)+" seconds...")
+    ### Check if using DMCA
         ASCII()
-    # Check if using DMCA
         if get_value("dmca_config_check:") == "":
+
             print("Do you intend to use DMCA? (for monitoring Windows based devices)")
             if yn() == "Y":
                 update_line_starting("dmca_config_check:", "dmca_config_check: yes", setup_config_file)
             else:
                 update_line_starting("dmca_config_check:", "dmca_config_check: no", setup_config_file)
 
-    # Check if using a proxy
+    ### Check if using a proxy
         if get_value("proxy_type:") == "":
             ASCII()
             print("Do you need this server to be configured to use a web proxy for HTTP(S) communication?")
@@ -754,9 +753,12 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 proxyqo2 = "A regular proxy (has a http:// prefix) and DOES decrypt external certificates and then re-encrypt the traffic with its own certificate\n  (Commonly referred to as a non-transparent proxy)\n"
                 proxyqo3 = "A secure proxy (has a https:// prefix) and DOES NOT decrypt external certificates and then re-encrypt the traffic with its own certificate\n  (Commonly referred to as a secure transparent proxy (a TLS connection is always established between the client and the proxy))\n"
                 proxyqo4 = "A secure proxy (has a https:// prefix) and DOES decrypt external certificates and then re-encrypt the traffic with its own certificate\n  (Commonly referred to as a secure non-transparent proxy (a TLS connection is always established between the client and the proxy))\n"
+                
+                #proxyqo1 = "The proxy doesn't inspect traffic content, it just confirms URLs/IPs aren't blacklisted, external certificates are preserved\n  (Commonly referred to as a transparent proxy)\n"
+                #proxyqo2 = "The proxy decrypts external certificates to inspect the content, it then re-encrypts it again using its own certificate\n  (Commonly referred to as a transparent proxy)\n"
+                
                 proxyqo5 = "Cancel / Skip proxy settings"
-                proxyqa = question(proxyq, proxyqo1, proxyqo2,
-                                   proxyqo3, proxyqo4, proxyqo5)
+                proxyqa = question(proxyq, proxyqo1, proxyqo2, proxyqo3, proxyqo4, proxyqo5)
 
                 if proxyqa == 1:
                     print(
@@ -791,7 +793,7 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 #if proxyqa == 1 or proxyqa == 2:
                     while True:
                         ASCII()
-                        test_proxy_address = input("Enter the full proxy address and port number\n( For example http://proxy.acmetntco.com:8080\n           or https://101.102.103.104:8443 )\n>")
+                        test_proxy_address = input("Enter the full proxy address and port number\n( For example http://proxy.acme-tnt-inc.com:8080\n           or https://101.102.103.104:8443 )\n>")
                         valid, address_type, address, port = validate_proxy_address(test_proxy_address)
                         if valid:
                             update_line_starting("proxy_port:", "proxy_port: "+port, setup_config_file)
@@ -832,11 +834,6 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                     add_cert(cert_type, cert_to_add)
 
     ### Symphony information collection
-        if get_value("account_name:") == "" or get_value("account_id:") == "" or get_value("account_portal:") == "" or get_value("cpx_serviceUserEmail:") == "" or get_value("cpx_serviceUserPassword:") == "" or get_value("dmca_config_check:") == "": 
-            ASCII()
-            print("Collecting Symphony specific settings now\n( you will need your welcome email )")
-            enter_to_cont()
-
         if get_value("account_name:") == "":
             while True:
                 ASCII()
@@ -902,15 +899,107 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                 if len(ccp) > 0:
                     update_line_starting("cpx_serviceUserPassword:", "cpx_serviceUserPassword: "+ccp, setup_config_file)
                     break
+    ### Values confirmation
+        ASCII()
 
+        print("###  Symphony settings:\n")
+        print("Account Name:             "+get_value("account_name:"))
+        print("Account ID:               "+get_value("account_id:"))
+        print("Symphony Portal:          "+get_value("account_portal:"))
+        print("Cloud Connector Username: "+get_value("cpx_serviceUserEmail:"))
+        print("Cloud Connector Password: "+get_value("cpx_serviceUserPassword:"))
+        
+        if get_value("dmca_config_check:") == "yes":
+            print("\n\n###  DMCA settings:\n")
+            print("Certificate Path:         "+get_value("ssl_cert_file_location:")+"/"+get_value("ssl_cert_file_name:"))
+            print("Certificate Password:     "+get_value("ssl_cert_file_pass:"))
+        
+        proxy_test = get_value("proxy_type:")
+        if proxy_test != "":
+            if proxy_test == "http://withfixup":
+                proxy_type = "Regular + Non-Transparent"
+            if proxy_test == "https://andNOfixup":
+                proxy_type = "End-to-End SSL + Transparent"
+            if proxy_test == "https://withfixup":
+                proxy_type = "End-to-End SSL + Non-Transparent"
+            print("\n\n###  Proxy settings:\n")
+            print("Type:                     "+proxy_type)
+            print("Address:                  "+get_value("proxy_address:"))
+            print("Port:                     "+get_value("proxy_port:"))
+            if get_value("proxy_type:") == "http://withfixup":
+                print("CA Cert:                  "+get_value("proxy_ca_cert:"))
+            if get_value("proxy_type:") == "https://andNOfixup":
+                print("SSL Cert:                 "+get_value("proxy_ssl_cert:"))
+            if get_value("proxy_type:") == "https://withfixup":
+                print("CA Cert:                  "+get_value("proxy_ca_cert:"))
+                print("SSL Cert:                 "+get_value("proxy_ssl_cert:"))
+        else:
+            print("No Proxy settings provided / required")
+
+        print("\n\nAre all of the details above correct?  ( 'No' to make changes or quit )\n")
+
+        if yn() == "Y":
+            stage = "final_stage"
+            update_line_starting("setup_stage:", "setup_stage: "+stage, setup_config_file)
+            break
+        else:
+            if get_value("dmca_config_check:") != "yes" and get_value("proxy_type:") == "":
+                symphony_change = question("Which setting did you want to change?", "Account Name", "Account ID", "Symphony Portal", "Cloud Connector Username", "Cloud Connector Password", "Quit this setup  (It will resume next time you login)")
+            elif get_value("dmca_config_check:") == "yes" and get_value("proxy_type:") == "":
+                symphony_change = question("Which setting did you want to change?", "Account Name", "Account ID", "Symphony Portal", "Cloud Connector Username", "Cloud Connector Password", "DMCA Configuration", "Quit this setup  (It will resume next time you login)")
+            elif get_value("dmca_config_check:") == "yes" and get_value("proxy_type:") != "":
+                symphony_change = question("Which setting did you want to change?", "Account Name", "Account ID", "Symphony Portal", "Cloud Connector Username", "Cloud Connector Password", "DMCA Configuration", "Proxy Configuration", "Quit this setup  (It will resume next time you login)")
+            elif get_value("dmca_config_check:") != "yes" and get_value("proxy_type:") != "":
+                symphony_change = question("Which setting did you want to change?", "Account Name", "Account ID", "Symphony Portal", "Cloud Connector Username", "Cloud Connector Password", "Proxy Configuration", "Quit this setup  (It will resume next time you login)")
+
+            if symphony_change == 1:
+                update_line_starting("account_name:", "account_name:", setup_config_file)
+                an = ""
+            if symphony_change == 2:
+                update_line_starting("account_id:", "account_id:", setup_config_file)
+                aid = ""
+            if symphony_change == 3:
+                update_line_starting("account_portal:", "account_portal:", setup_config_file)
+                portal = ""
+            if symphony_change == 4:
+                update_line_starting("cpx_serviceUserEmail:", "cpx_serviceUserEmail:", setup_config_file)
+                ccu = ""
+            if symphony_change == 5:
+                update_line_starting("cpx_serviceUserPassword:", "cpx_serviceUserPassword:", setup_config_file)
+                ccp = ""
+            
+            if get_value("dmca_config_check:") == "yes":
+                if symphony_change == 6:
+                    update_line_starting("dmca_config_check:", "dmca_config_check:", setup_config_file)
+                    update_line_starting("ssl_cert_file_name:", "ssl_cert_file_name:", setup_config_file)
+                    update_line_starting("ssl_cert_file_pass:", "ssl_cert_file_pass:", setup_config_file)
+                    update_line_starting("ssl_cert_file_location:", "ssl_cert_file_location:", setup_config_file)
+                    ntpstring = ""
+                if get_value("proxy_type:") != "":
+                    if symphony_change == 7:
+                        update_line_starting("proxy_type:", "proxy_type:", setup_config_file)
+                        update_line_starting("proxy_address:", "proxy_address:", setup_config_file)
+                        update_line_starting("proxy_port:", "proxy_port:", setup_config_file)
+                        update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
+                        update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
+            elif get_value("proxy_type:") != "":
+                if symphony_change == 6:
+                    update_line_starting("proxy_type:", "proxy_type:", setup_config_file)
+                    update_line_starting("proxy_address:", "proxy_address:", setup_config_file)
+                    update_line_starting("proxy_port:", "proxy_port:", setup_config_file)
+                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
+                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
+        
 #########################################################################################################
-####### Info collection done, start applying 
+####### Info collection done, start applying
+    stage = get_value("setup_stage:")
+    while stage == "final_stage":
     ### Now add colledted data to the Ansible variable file (or update them if they already exist)
         defaults_file = "/symphony/symphony-cpx-ansible-role/defaults/main.yml"
         defaults_vars = ["account_name:", "account_id:", "account_portal:", "cpx_serviceUserEmail:", "cpx_serviceUserPassword:", "dmca_config_check:",
                          "ssl_cert_file_name:", "ssl_cert_file_location:", "ssl_cert_file_pass:", "proxy_ca_cert:", "proxy_ssl_cert:", "proxy_type:"]
-        for i in defaults_vars:
-            update_defaults_file(i, defaults_file)
+        for s in defaults_vars:
+            update_defaults_file(s, defaults_file)
 
     ### generate the new initial yaml file (excluding the Q & A section), which is then run instead of start_here.yml
         playbook = '''---
@@ -1033,7 +1122,6 @@ done
         subprocess.run("touch "+ setenv_path, shell=True)
         with open(setenv_path, 'a') as file:
             file.write(set_env)
-
 ###
         docker_compose_template = "/symphony/symphony-cpx-ansible-role/templates/docker-compose.yml.j2"
         backup_original(docker_compose_template)
