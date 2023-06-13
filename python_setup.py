@@ -209,12 +209,14 @@ def get_value(search_string, file_to_search=setup_config_file, retain_spaces=0):
         pattern = r'(?<=' + search_string + r')(.*)'
         match = re.search(pattern, content)
         if match:
-            found_val = match.group(1).strip().replace(' ', '')
             if retain_spaces == 1:
-                pattern = r'(\w+.*)'
+                found_val = match.group(1).strip()
+                pattern = r'(\w+.*)' # remove only starting & ending spaces
                 match = re.search(pattern, found_val)
                 if match:
                     found_val = match.group(1).strip()
+            else:
+                found_val = match.group(1).strip().replace(' ', '') # remove all spaces
             return found_val
         else:
             return "NOT FOUND"
@@ -749,48 +751,13 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
             else:
                 ASCII()
                 proxyq = "Select the option which best describes your proxy"
-                proxyqo1 = "A regular proxy (has a http:// prefix) and DOES NOT decrypt external certificates\n  (Commonly referred to as a transparent proxy)\n"
-                proxyqo2 = "A regular proxy (has a http:// prefix) and DOES decrypt external certificates and then re-encrypt the traffic with its own certificate\n  (Commonly referred to as a non-transparent proxy)\n"
-                proxyqo3 = "A secure proxy (has a https:// prefix) and DOES NOT decrypt external certificates and then re-encrypt the traffic with its own certificate\n  (Commonly referred to as a secure transparent proxy (a TLS connection is always established between the client and the proxy))\n"
-                proxyqo4 = "A secure proxy (has a https:// prefix) and DOES decrypt external certificates and then re-encrypt the traffic with its own certificate\n  (Commonly referred to as a secure non-transparent proxy (a TLS connection is always established between the client and the proxy))\n"
+                proxyqo1 = "The proxy does not inspect traffic content, it only filters blacklisted URLs/IPs, and external certificates are preserved/forwarded"
+                proxyqo2 = "The proxy decrypts external certificates to inspect the traffic content, it then re-encrypts it again using its own certificate"
+                proxyqo3 = "Cancel / Skip proxy settings"
                 
-                #proxyqo1 = "The proxy doesn't inspect traffic content, it just confirms URLs/IPs aren't blacklisted, external certificates are preserved\n  (Commonly referred to as a transparent proxy)\n"
-                #proxyqo2 = "The proxy decrypts external certificates to inspect the content, it then re-encrypts it again using its own certificate\n  (Commonly referred to as a transparent proxy)\n"
-                
-                proxyqo5 = "Cancel / Skip proxy settings"
-                proxyqa = question(proxyq, proxyqo1, proxyqo2, proxyqo3, proxyqo4, proxyqo5)
+                proxyqa = question(proxyq, proxyqo1, proxyqo2, proxyqo3)
 
-                if proxyqa == 1:
-                    print(
-                        "\nThis should work, details will be collected in the next step")
-                    update_line_starting("proxy_type:", "proxy_type: http:// and NO fixup", setup_config_file)
-                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
-                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
-                    # should not need CA cert
-                elif proxyqa == 2:
-                    print(
-                        "\nThis should work, however if the proxy certificate is self-signed (not publicly trusted) some functionality may not work")
-                    print("specifically, the ability to remotely restart and upgrade the Cloud Connector, but the main funcion of collecting and sending monitoring data should still work")
-                    print("details will be collected in the next step")
-                    # will need CA cert
-                    update_line_starting("proxy_type:", "proxy_type: http:// with fixup", setup_config_file)
-                    update_line_starting("proxy_ssl_cert:", "proxy_ssl_cert:", setup_config_file)
-                elif proxyqa == 3:
-                    print("\nNot currently supported")
-                    # need to test with the proxy Dan said we had
-                    # will need SSL cert
-                    update_line_starting("proxy_type:", "proxy_type: https:// and NO fixup", setup_config_file)
-                    update_line_starting("proxy_ca_cert:", "proxy_ca_cert:", setup_config_file)
-                elif proxyqa == 4:
-                    print("\nNot currently supported")
-                    # need to test with the proxy Dan said we had
-                    # will need SSL and CA cert
-                    update_line_starting("proxy_type:", "proxy_type: https:// with fixup", setup_config_file)
-
-                enter_to_cont()
-
-                if proxyqa != 5 or proxyqa != 1:
-                #if proxyqa == 1 or proxyqa == 2:
+                if proxyqa != 3:
                     while True:
                         ASCII()
                         test_proxy_address = input("Enter the full proxy address and port number\n( For example http://proxy.acme-tnt-inc.com:8080\n           or https://101.102.103.104:8443 )\n>")
@@ -798,6 +765,16 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
                         if valid:
                             update_line_starting("proxy_port:", "proxy_port: "+port, setup_config_file)
                             update_line_starting("proxy_address:", "proxy_address: "+address, setup_config_file)
+                            if test_proxy_address.lower().startswith("http://"):
+                                if proxyqa == 1:
+                                    update_line_starting("proxy_type:", "proxy_type: http:// and NO fixup", setup_config_file)
+                                else:
+                                    update_line_starting("proxy_type:", "proxy_type: http:// with fixup", setup_config_file)
+                            elif test_proxy_address.lower().startswith("https://"):
+                                if proxyqa == 1:
+                                    update_line_starting("proxy_type:", "proxy_type: https:// and NO fixup", setup_config_file)                                    
+                                else:
+                                    update_line_starting("proxy_type:", "proxy_type: https:// with fixup", setup_config_file)
                             break
 
     ### Install required certs
