@@ -2,7 +2,7 @@
 
 A script to automate the setup of CPXs
 
-Place all files on the Cloud Connecteor VM
+Place all files on the Cloud Connector VM
 
 Make the setup-setup.sh file executable and then run it (this makes the other script files executable and moves them to their correct locations)
 
