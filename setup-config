@@ -25,6 +25,8 @@ dns1:
 dns2:
 dns3:
 hostname:
+#ntp_address is 3 parts: pool or server, address, iburst
+#Example: pool 2.debian.pool.ntp.org iburst
 ntp_address:
 external_ip:
 ####################################################################
