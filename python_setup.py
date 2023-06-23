@@ -143,15 +143,6 @@ def update_line_containing(search_string, new_value, setup_config_file):
                 line = f"{new_value}\n"
             file.write(line)
 
-'''def update_line_starting(search_string, new_value, setup_config_file):
-    with open(setup_config_file, 'r') as file:
-        lines = file.readlines()
-    with open(setup_config_file, 'w') as file:
-        for line in lines:
-            if line.startswith(search_string):
-                line = f"{new_value}\n"
-            file.write(line)'''
-
 def update_line_starting(search_string, new_value, setup_config_file):
     with open(setup_config_file, 'r') as file:
         lines = file.readlines()
@@ -904,28 +895,28 @@ The DNS server(s) this machine will use:       DNS 1: {dns1}""")
         
         proxy_test = get_value("proxy_type:")
         if proxy_test != "":
-	    if proxy_test == "none":
-		print("No Proxy settings provided / required")
-	    else:
-	        if proxy_test == "http://withfixup":
-		    proxy_type = "Regular + Non-Transparent"
-	        if proxy_test == "https://andNOfixup":
-		    proxy_type = "SSL to Proxy + Transparent"
-	        if proxy_test == "https://withfixup":
-		    proxy_type = "SSL to Proxy + Non-Transparent"
-                print("\n\n###  Proxy settings:\n")
-	        print("Type:                     "+proxy_type)
-	        print("Address:                  "+get_value("proxy_address:"))
-	        print("Port:                     "+get_value("proxy_port:"))
-	        if get_value("proxy_type:") == "http://withfixup":
-		    print("CA Cert:                  "+get_value("proxy_ca_cert:"))
-	        if get_value("proxy_type:") == "https://andNOfixup":
-		    print("SSL Cert:                 "+get_value("proxy_ssl_cert:"))
-	        if get_value("proxy_type:") == "https://withfixup":
-		    print("CA Cert:                  "+get_value("proxy_ca_cert:"))
-		    print("SSL Cert:                 "+get_value("proxy_ssl_cert:"))
+            if proxy_test == "none":
+                print("No Proxy settings provided / required")
+            else:
+                if proxy_test == "http://withfixup":
+                    proxy_type = "Regular + Non-Transparent"
+                if proxy_test == "https://andNOfixup":
+                    proxy_type = "SSL to Proxy + Transparent"
+                if proxy_test == "https://withfixup":
+                    proxy_type = "SSL to Proxy + Non-Transparent"
+                    print("\n\n###  Proxy settings:\n")
+                    print("Type:                     "+proxy_type)
+                    print("Address:                  "+get_value("proxy_address:"))
+                    print("Port:                     "+get_value("proxy_port:"))
+                if get_value("proxy_type:") == "http://withfixup":
+                    print("CA Cert:                  "+get_value("proxy_ca_cert:"))
+                if get_value("proxy_type:") == "https://andNOfixup":
+                    print("SSL Cert:                 "+get_value("proxy_ssl_cert:"))
+                if get_value("proxy_type:") == "https://withfixup":
+                    print("CA Cert:                  "+get_value("proxy_ca_cert:"))
+                    print("SSL Cert:                 "+get_value("proxy_ssl_cert:"))
 
-	print("\n\nAre all of the details above correct?  ( 'No' to make changes or quit )\n")
+        print("\n\nAre all of the details above correct?  ( 'No' to make changes or quit )\n")
 
         if yn() == "Y":
             stage = "final_stage"
